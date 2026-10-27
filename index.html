@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#1d4ed8">
+<link rel="manifest" href="manifest.json"><link rel="icon" href="icon.svg">
+<title>Meu Pagamento</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,sans-serif;background:#f3f4f6;color:#111;padding:14px;max-width:480px;margin:auto}
+h1{font-size:20px;margin:4px 0 12px}.c{background:#fff;border-radius:12px;padding:12px;margin-bottom:12px}
+.g{display:grid;grid-template-columns:1fr 1fr;gap:10px}label{font-size:12px;color:#555;display:block;margin-bottom:3px}
+input{width:100%;height:42px;font-size:16px;padding:0 8px;border:1px solid #ccc;border-radius:8px}
+button{width:100%;height:48px;font-size:16px;border:0;border-radius:10px;background:#1d4ed8;color:#fff;margin-bottom:12px}
+.r{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #eee;font-size:15px}.r:last-child{border:0}
+.n{color:#b91c1c}.l{background:#dcfce7;color:#166534;border-radius:12px;padding:14px;display:flex;justify-content:space-between;align-items:baseline;font-size:15px}
+.l b{font-size:26px}#st{font-size:13px;color:#555;margin:0 0 10px}
+</style></head><body>
+<h1>Meu Pagamento</h1>
+<button id="b1">Tirar foto</button>
+<button id="b2" style="background:#fff;color:#1d4ed8;border:1px solid #1d4ed8">Anexar arquivo (foto ou PDF)</button>
+<input type="file" id="f1" accept="image/*" capture="environment" hidden>
+<input type="file" id="f2" accept="image/*,application/pdf" hidden>
+<p id="st" style="white-space:pre-line"></p>
+<div class="c"><div class="g">
+<div><label>Mês</label><input type="month" id="m"></div>
+<div><label>Valor da hora (R$)</label><input type="number" id="vh" step="0.01" value="11.07"></div>
+<div><label>Pontos azuis (R$)</label><input type="number" id="pa" step="0.01" value="0"></div>
+<div><label>Domingos + feriados</label><input type="number" id="df" step="1"></div>
+<div><label>Atraso (R$)</label><input type="number" id="at" step="0.01" value="0"></div>
+<div><label>Imposto de renda (R$)</label><input type="number" id="ir" step="0.01" value="0"></div>
+</div></div>
+<div class="c">
+<div class="r"><span>Horas do mês</span><span id="a"></span></div>
+<div class="r"><span>Pontos azuis</span><span id="b"></span></div>
+<div class="r"><span>Repouso remunerado</span><span id="c"></span></div>
+<div class="r"><b>Bruto</b><b id="d"></b></div>
+<div class="r"><span>Atraso</span><span class="n" id="e"></span></div>
+<div class="r"><span>Vale 40%</span><span class="n" id="v"></span></div>
+<div class="r"><span>INSS</span><span class="n" id="i"></span></div>
+<div class="r"><span>Imposto de renda</span><span class="n" id="j"></span></div>
+</div>
+<div class="l"><span>Líquido</span><b id="liq"></b></div>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+var $=function(i){return document.getElementById(i)};
+var R=function(x){return Math.round(x*100+1e-9)/100},T=function(x){return Math.floor(x*100+1e-9)/100};
+var F=function(n){return 'R$ '+n.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})};
+var FX=[[0,1],[3,21],[4,1],[8,7],[9,12],[10,2],[10,15],[10,20],[11,25]];
+function feriados(y){var a=y%19,b=Math.floor(y/100),c=y%100,d=Math.floor(b/4),e=b%4,g=Math.floor((8*b+13)/25),h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451),mo=Math.floor((h+l-7*m+114)/31),di=((h+l-7*m+114)%31)+1;
+return FX.map(function(x){return new Date(y,x[0],x[1])}).concat([new Date(y,mo-1,di-2)])}
+function inss(base){var fx=[[1621.00,.075],[2902.84,.09],[4354.27,.12],[8475.55,.14]],t=0,ant=0;
+for(var i=0;i<fx.length&&base>ant;i++){t+=T((Math.min(base,fx[i][0])-ant)*fx[i][1]);ant=fx[i][0]}return R(t)}
+function auto(){var p=$('m').value.split('-').map(Number),y=p[0],mo=p[1],n=new Date(y,mo,0).getDate(),k=0;
+for(var d=1;d<=n;d++)if(new Date(y,mo-1,d).getDay()===0)k++;
+feriados(y).forEach(function(x){if(x.getMonth()===mo-1&&x.getDay()!==0)k++});$('df').value=k;calc()}
+function calc(){var p=$('m').value.split('-').map(Number),n=new Date(p[0],p[1],0).getDate(),vh=+$('vh').value,pa=+$('pa').value,df=+$('df').value,at=+$('at').value,ir=+$('ir').value;
+var h=R(220*vh*n/30),dsr=T(pa/26*df),br=R(h+pa+dsr),vale=R(220*vh*.4),is=inss(R(br-at));
+$('a').textContent=F(h);$('b').textContent=F(pa);$('c').textContent=F(dsr);$('d').textContent=F(br);
+$('e').textContent='− '+F(at);$('v').textContent='− '+F(vale);$('i').textContent='− '+F(is);$('j').textContent='− '+F(ir);
+$('liq').textContent=F(R(br-at-vale-is-ir));try{localStorage.setItem('vh',$('vh').value)}catch(e){}}
+function num(s){return parseFloat(s.replace(/\./g,'').replace(',','.'))}
+var COD=['051','101','121','151','154'];
+function ler(txt){var pa=0,at=0,det=[],mm=txt.match(/(?:Compet|Referente)[^\d]*(\d{2})\/(20\d{2})/i)||txt.match(/(?<![\d\/])(\d{2})\/(20\d{2})/);
+if(mm&&+mm[1]>=1&&+mm[1]<=12)$('m').value=mm[2]+'-'+mm[1];
+txt.split('\n').forEach(function(l){var c=l.trim().match(/^(\d{3})\s/);if(!c)return;
+var v=l.match(/\d{1,3}(?:\.\d{3})*,\d{2}/g);if(!v)return;var x=num(v[v.length-1]);
+if(COD.indexOf(c[1])>=0){pa+=x;det.push(c[1]+': '+F(x))}else if(c[1]==='210'){at+=x;det.push('210 atraso: '+F(x))}});
+$('pa').value=R(pa);$('at').value=R(at);auto();
+$('st').textContent=det.length?'Lido: '+det.join(' | ')+'\nConfira antes de usar.':'Não consegui ler os itens. Preencha os campos à mão.'}
+function ocr(img){$('st').textContent='Lendo a imagem…';
+if(!window.Tesseract){$('st').textContent='A leitura precisa de internet.';return}
+Tesseract.recognize(img,'por').then(function(r){ler(r.data.text)}).catch(function(){$('st').textContent='Falha na leitura. Preencha os campos à mão.'})}
+async function pdf(f){$('st').textContent='Lendo o PDF…';
+try{pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+var d=await pdfjsLib.getDocument({data:await f.arrayBuffer()}).promise,txt='',pg;
+for(var p=1;p<=d.numPages;p++){pg=await d.getPage(p);var it=(await pg.getTextContent()).items.slice().sort(function(a,b){return b.transform[5]-a.transform[5]||a.transform[4]-b.transform[4]});
+var ln=[],y=null;it.forEach(function(t){if(y===null||Math.abs(t.transform[5]-y)>3){ln.push([]);y=t.transform[5]}ln[ln.length-1].push(t)});
+ln.forEach(function(l){l.sort(function(a,b){return a.transform[4]-b.transform[4]});txt+=l.map(function(t){return t.str}).join(' ')+'\n'})}
+if(txt.replace(/\s/g,'').length>50){ler(txt);return}
+var vp=pg.getViewport({scale:2.5}),cv=document.createElement('canvas');cv.width=vp.width;cv.height=vp.height;
+await pg.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise;ocr(cv)
+}catch(e){$('st').textContent='Não consegui abrir o PDF. Preencha os campos à mão.'}}
+function arq(f){if(!f)return;if(f.type==='application/pdf'||/\.pdf$/i.test(f.name))pdf(f);else ocr(f)}
+$('b1').onclick=function(){$('f1').click()};$('b2').onclick=function(){$('f2').click()};
+$('f1').onchange=function(){arq(this.files[0]);this.value=''};$('f2').onchange=function(){arq(this.files[0]);this.value=''};
+['vh','pa','df','at','ir'].forEach(function(i){$(i).addEventListener('input',calc)});$('m').addEventListener('input',auto);
+try{var s=localStorage.getItem('vh');if(s)$('vh').value=s}catch(e){}
+var hj=new Date();$('m').value=hj.getFullYear()+'-'+('0'+(hj.getMonth()+1)).slice(-2);auto();
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');
+</script></body></html>
